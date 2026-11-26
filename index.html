@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clocking Out?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a punch-clock timecard. Each section is a "shift" on the card, stamped with a clock time. */
+:root{
+  --paper:#e9edf1; --card:#f8fafb; --ink:#14202b; --muted:#566573;
+  --rule:#c9d2db; --blue:#1d4ed8; --stamp:#c2331f;
+  --low:#1f7a4d; --mid:#b7791f; --high:#c2331f;
+  --display:"Archivo","Arial Narrow",Arial,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0f151b; --card:#17202a; --ink:#e6edf3; --muted:#9aa8b5;
+  --rule:#2b3845; --blue:#7aa2ff; --stamp:#ff7a63;
+  --low:#4cc38a; --mid:#e3b04b; --high:#ff7a63; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f151b; --card:#17202a; --ink:#e6edf3; --muted:#9aa8b5;
+  --rule:#2b3845; --blue:#7aa2ff; --stamp:#ff7a63;
+  --low:#4cc38a; --mid:#e3b04b; --high:#ff7a63; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{background:var(--paper);color:var(--ink);font:400 1.05rem/1.6 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:960px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.02}
+p{margin:0}
+.mono{font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* nav */
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--rule);
+  margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-left,0px))}
+nav .wrap{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none}
+nav a{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  text-decoration:none;padding:6px 10px;border-radius:4px;white-space:nowrap}
+nav a.on{background:var(--ink);color:var(--paper)}
+nav a:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+nav .hint{margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--muted);white-space:nowrap}
+
+/* hero */
+header{padding-block:56px 40px}
+.hero{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end}
+.hero h1{font-size:clamp(3rem,11vw,7.5rem);font-weight:900;font-stretch:72%;text-transform:uppercase;letter-spacing:-.01em}
+.hero h1 span{color:var(--stamp)}
+.hero .q{font-family:var(--display);font-stretch:110%;font-weight:600;font-size:clamp(1.2rem,3vw,1.6rem);margin-top:14px;max-width:30ch}
+.hero .by{margin-top:18px;color:var(--muted);max-width:56ch}
+.clock{width:150px;height:150px}
+.clock circle.face{fill:var(--card);stroke:var(--ink);stroke-width:4}
+.clock .tick{stroke:var(--muted);stroke-width:2}
+.clock .hand{stroke:var(--ink);stroke-width:5;stroke-linecap:round}
+.clock .sec{stroke:var(--stamp);stroke-width:2}
+@media (max-width:620px){.hero{grid-template-columns:1fr}.clock{width:96px;height:96px;order:-1}}
+
+/* timecard sections */
+section{scroll-margin-top:64px;padding-block:28px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.card-head{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:18px 22px;border-bottom:2px dashed var(--rule)}
+.punch{font-family:var(--mono);font-weight:600;font-size:.85rem;color:var(--stamp);border:2px solid var(--stamp);
+  padding:6px 10px;border-radius:3px;transform:rotate(-4deg);white-space:nowrap}
+.card-head h2{font-size:clamp(1.6rem,4.5vw,2.6rem);font-weight:800;font-stretch:85%;text-transform:uppercase}
+.card-body{padding:22px;display:grid;gap:22px}
+.lead{font-size:1.15rem;max-width:62ch}
+.qs{display:grid;gap:14px;list-style:none;margin:0;padding:0}
+.qs li{display:grid;grid-template-columns:28px 1fr;gap:12px;min-width:0}
+.qs li::before{content:"?";font-family:var(--display);font-weight:900;font-size:1.3rem;color:var(--blue);line-height:1.3}
+.qs b{display:block;font-weight:600}
+.qs span{color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.two>*{min-width:0}
+.box{border:1px solid var(--rule);border-radius:4px;padding:16px;display:grid;gap:8px}
+.box h3{font-size:1.05rem;font-weight:700;font-stretch:100%;text-transform:uppercase;letter-spacing:.03em}
+.box ul{margin:0;padding-left:1.1em;display:grid;gap:4px}
+.quote{font-family:var(--display);font-stretch:95%;font-weight:600;font-size:1.3rem;line-height:1.3;border-left:4px solid var(--stamp);padding-left:16px;max-width:52ch}
+
+/* job picker */
+.jobs{display:flex;flex-wrap:wrap;gap:8px}
+.jobs button{font:600 .9rem var(--body);background:transparent;color:var(--ink);border:1.5px solid var(--rule);
+  border-radius:999px;padding:8px 14px;cursor:pointer}
+.jobs button:hover{border-color:var(--ink)}
+.jobs button[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start;border:1px solid var(--rule);border-radius:4px;padding:18px}
+.verdict>*{min-width:0}
+.meter{width:120px}
+.meter .lbl{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.bar{height:10px;background:var(--rule);border-radius:5px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;border-radius:5px;transition:width .4s ease}
+.risk{font-family:var(--display);font-weight:900;font-stretch:80%;font-size:1.8rem;text-transform:uppercase;margin-top:6px}
+.verdict h3{font-size:1.4rem;font-weight:800;font-stretch:90%}
+.verdict p{color:var(--muted);margin-top:6px}
+@media (max-width:520px){.verdict{grid-template-columns:1fr}}
+
+/* zoe toggle */
+.toggle{display:inline-flex;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden}
+.toggle button{font:600 .9rem var(--body);background:transparent;color:var(--ink);border:0;padding:8px 16px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+.day{display:grid;gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.day div{display:grid;grid-template-columns:70px 1fr;gap:14px;padding:10px 14px;border-top:1px solid var(--rule)}
+.day div:first-child{border-top:0}
+.day time{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.day .ai{color:var(--blue);font-weight:600}
+.disclaim{font-size:.85rem;color:var(--muted)}
+
+/* quiz */
+.quiz{display:grid;gap:16px}
+.qq{border:1px solid var(--rule);border-radius:4px;padding:16px;display:grid;gap:10px}
+.qq p{font-weight:600}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts button{font:500 .9rem var(--body);background:transparent;color:var(--ink);border:1.5px solid var(--rule);border-radius:4px;padding:8px 12px;cursor:pointer}
+.opts button.right{border-color:var(--low);color:var(--low);font-weight:700}
+.opts button.wrong{border-color:var(--high);color:var(--high);text-decoration:line-through}
+.fb{font-size:.92rem;color:var(--muted)}
+.score{font-family:var(--mono);font-size:.85rem}
+
+/* final */
+.final h2{font-size:clamp(2.2rem,8vw,5rem);font-weight:900;font-stretch:72%;text-transform:uppercase}
+.final h2 span{color:var(--stamp)}
+.rubric{width:100%;border-collapse:collapse;font-size:.95rem}
+.rubric th,.rubric td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+.rubric th{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.dots{display:flex;gap:4px}
+.dots button{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink);background:transparent;cursor:pointer;padding:0}
+.dots button.on{background:var(--ink)}
+.tablewrap{overflow-x:auto}
+footer{padding-block:32px 48px;color:var(--muted);font-size:.85rem}
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+
+<nav aria-label="Sections"><div class="wrap">
+  <a href="#start">Start</a>
+  <a href="#humans">Humans</a>
+  <a href="#costs">Costs</a>
+  <a href="#zoe">Zoe</a>
+  <a href="#future">Future</a>
+  <a href="#verdict">Verdict</a>
+  <span class="hint">← → to move</span>
+</div></nav>
+
+<div class="wrap">
+<header id="start">
+  <div class="hero">
+    <div>
+      <p class="mono">English project · 5th year · Need to know</p>
+      <h1>Clocking <span>out?</span></h1>
+      <p class="q">How might AI replace human workers?</p>
+      <p class="by">Before answering the big question, we have to figure out what we actually need to know. So this is everything I found out about workers, costs, AI "employees" and where the economy might be going. Spoiler: it's complicated, and kind of scary.</p>
+    </div>
+    <svg class="clock" viewBox="0 0 100 100" role="img" aria-label="Punch clock">
+      <circle class="face" cx="50" cy="50" r="45"/>
+      <g id="ticks"></g>
+      <line class="hand" id="hh" x1="50" y1="50" x2="50" y2="28"/>
+      <line class="hand" id="mh" x1="50" y1="50" x2="50" y2="16" style="stroke-width:3"/>
+      <line class="sec" id="sh" x1="50" y1="56" x2="50" y2="12"/>
+      <circle cx="50" cy="50" r="3" fill="var(--stamp)"/>
+    </svg>
+  </div>
+</header>
+
+<!-- 1 -->
+<section id="humans"><div class="card">
+  <div class="card-head"><span class="punch">IN 08:00</span><h2>Human workers &amp; traditional jobs</h2></div>
+  <div class="card-body">
+    <p class="lead">First we need to understand who is actually working right now, and which parts of their jobs are things only a person can do.</p>
+    <ul class="qs">
+      <li><div><b>Which jobs are mostly repetitive?</b><span>Cashiers, call centers, data entry, a lot of office paperwork. If you can write the job as a list of steps, a computer can probably learn it.</span></div></li>
+      <li><div><b>What can humans do that AI still can't?</b><span>Empathy, common sense, reading a room, fixing a pipe in some weird old bathroom, and being responsible when something goes wrong.</span></div></li>
+      <li><div><b>How many people around us could be affected?</b><span>In Argentina a lot of people work informally or in small family shops. Would AI even reach them the same way it reaches a big company in the US? I honestly don't know.</span></div></li>
+    </ul>
+
+    <div>
+      <p class="mono" style="margin-bottom:10px">Try it · Will AI take this job?</p>
+      <div class="jobs" id="jobs" role="group" aria-label="Pick a job"></div>
+    </div>
+    <div class="verdict" aria-live="polite">
+      <div class="meter"><div class="lbl">Risk (my guess)</div><div class="bar"><i id="vbar"></i></div><div class="risk" id="vrisk"></div></div>
+      <div><h3 id="vjob"></h3><p id="vwhy"></p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section id="costs"><div class="card">
+  <div class="card-head"><span class="punch">10:30</span><h2>The problem: automation &amp; costs</h2></div>
+  <div class="card-body">
+    <p class="lead">Companies don't use AI because it's cool. They use it because of money. So we need to know if it's really cheaper, and who pays the price.</p>
+    <div class="two">
+      <div class="box">
+        <h3>Why a company would pick AI</h3>
+        <ul>
+          <li>It works 24/7, no breaks, no sick days</li>
+          <li>It never asks for a raise or goes on strike</li>
+          <li>One program can do the work of a whole team</li>
+          <li>It gets cheaper every year</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>The hidden costs</h3>
+        <ul>
+          <li>Software, servers and electricity aren't free</li>
+          <li>You still need people to check it when it messes up</li>
+          <li>Customers sometimes hate talking to a bot</li>
+          <li>Someone has to retrain the workers who got replaced</li>
+        </ul>
+      </div>
+    </div>
+    <ul class="qs">
+      <li><div><b>What gets automated first?</b><span>Tasks, not whole jobs. The boring, predictable parts go first: filling forms, answering the same question 200 times, sorting stuff.</span></div></li>
+      <li><div><b>Who pays to retrain people?</b><span>The company? The government? The worker? Right now it feels like nobody has a clear answer, and that's kind of the problem.</span></div></li>
+    </ul>
+  </div>
+</div></section>
+
+<!-- 3 -->
+<section id="zoe"><div class="card">
+  <div class="card-head"><span class="punch">12:00</span><h2>AI workers · Case study: Zoe the teacher</h2></div>
+  <div class="card-body">
+    <p class="lead">Zoe teaches history at a high school. This year her school starts testing an AI tutor. Here's what a normal Tuesday looks like for her.</p>
+    <div class="toggle" role="group" aria-label="Zoe's day">
+      <button type="button" id="zBefore" aria-pressed="true">Before AI</button>
+      <button type="button" id="zAfter" aria-pressed="false">With AI</button>
+    </div>
+    <div class="day" id="zday" aria-live="polite"></div>
+    <div class="two">
+      <div class="box">
+        <h3>What the AI does better</h3>
+        <ul>
+          <li>Marks 90 tests in seconds</li>
+          <li>Explains the same topic 50 times without getting annoyed</li>
+          <li>Is there at 2 a.m. the night before the exam</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>What only Zoe can do</h3>
+        <ul>
+          <li>Notice a student is having a bad day</li>
+          <li>Control a class that's going crazy</li>
+          <li>Catch the AI when it makes stuff up with total confidence</li>
+        </ul>
+      </div>
+    </div>
+    <p class="quote">The real question isn't "can the AI teach?" It's whether the school uses it to help Zoe, or to replace her with one teacher and a screen for 60 kids.</p>
+    <p class="disclaim">Zoe is a made-up example we used to think about the topic.</p>
+  </div>
+</div></section>
+
+<!-- 4 -->
+<section id="future"><div class="card">
+  <div class="card-head"><span class="punch">16:00</span><h2>The future of the economy</h2></div>
+  <div class="card-body">
+    <p class="lead">This is the part nobody can answer for sure, but these are the things we need to find out.</p>
+    <div class="two">
+      <div class="box"><h3>Jobs that might shrink</h3><ul><li>Call center agents</li><li>Data entry &amp; admin</li><li>Basic translation</li><li>Simple graphic design</li></ul></div>
+      <div class="box"><h3>Jobs that might appear</h3><ul><li>People who train &amp; check AI</li><li>AI + human "hybrid" roles</li><li>Tech repair &amp; maintenance</li><li>Jobs we can't even imagine yet</li></ul></div>
+    </div>
+    <ul class="qs">
+      <li><div><b>If companies save money, who keeps it?</b><span>Just the owners, or does it reach regular people with lower prices, better salaries or shorter work weeks?</span></div></li>
+      <li><div><b>What should people my age study?</b><span>Something AI can't easily copy, or something that teaches you to use AI really well. Ideally both.</span></div></li>
+    </ul>
+
+    <div>
+      <p class="mono" style="margin-bottom:10px">Quick quiz · 3 questions</p>
+      <div class="quiz" id="quiz"></div>
+      <p class="score" id="score" style="margin-top:10px"></p>
+    </div>
+  </div>
+</div></section>
+
+<!-- verdict -->
+<section id="verdict" class="final"><div class="card">
+  <div class="card-head"><span class="punch">OUT 18:00</span><h2>So… will AI <span>replace us?</span></h2></div>
+  <div class="card-body">
+    <p class="lead">Honestly? It worries me a bit. AI is moving crazy fast and nobody really knows where it's going. But after all this, I don't think it's going to replace <em>everyone</em>.</p>
+    <p class="quote">AI will probably replace parts of jobs, not whole people. And the people who know how to use AI will probably replace the people who don't.</p>
+    <div>
+      <p class="mono" style="margin-bottom:10px">Reflection · self-assessment (tap to rate 1–5)</p>
+      <div class="tablewrap">
+      <table class="rubric">
+        <thead><tr><th>Criteria</th><th>Rating</th></tr></thead>
+        <tbody id="rubric"></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="box">
+      <h3>What I learned</h3>
+      <p>Before this project I thought AI would just show up one day and take everybody's job. Now I get that it's more about tasks, costs and decisions people make. The scary part isn't the robots, it's whether companies and governments handle the change well.</p>
+    </div>
+  </div>
+</div></section>
+
+<footer>Made for English class · How might AI replace human workers?</footer>
+</div>
+
+<script>
+// clock
+(function(){
+  const t=document.getElementById('ticks');
+  for(let i=0;i<12;i++){const a=i*30*Math.PI/180;const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('class','tick');l.setAttribute('x1',50+38*Math.sin(a));l.setAttribute('y1',50-38*Math.cos(a));
+    l.setAttribute('x2',50+43*Math.sin(a));l.setAttribute('y2',50-43*Math.cos(a));t.appendChild(l);}
+  const set=(id,deg)=>document.getElementById(id).setAttribute('transform',`rotate(${deg} 50 50)`);
+  function tick(){const d=new Date();const s=d.getSeconds(),m=d.getMinutes()+s/60,h=(d.getHours()%12)+m/60;
+    set('sh',s*6);set('mh',m*6);set('hh',h*30);}
+  tick();setInterval(tick,1000);
+})();
+
+// jobs
+const JOBS=[
+  ["Cashier",85,"Self-checkout machines are already everywhere. Some human cashiers will stay for help and problems, but a lot fewer."],
+  ["Call center",90,"Chatbots can already answer most simple questions. This is probably the job most at risk right now."],
+  ["Teacher",35,"AI can explain and mark tests, but kids need someone who cares, sets limits and notices when something is wrong (see Zoe)."],
+  ["Programmer",50,"AI writes a lot of code now, so junior jobs are getting harder. But someone still has to decide what to build and fix it when it breaks."],
+  ["Plumber",10,"Every house is different and robots are still terrible at crawling under a sink. Probably one of the safest jobs."],
+  ["Nurse",15,"AI can help with records and diagnosis, but taking care of a scared patient is a deeply human thing."],
+  ["Graphic designer",60,"Image generators make simple designs in seconds. Designers with real ideas and taste will survive, but there'll be fewer of them."],
+  ["Truck driver",55,"Self-driving trucks are being tested, but roads, weather and laws make it slower than people expected."],
+  ["Translator",70,"AI translation is really good now. Humans are still needed for legal stuff, literature and anything where a mistake is expensive."]
+];
+const lvl=p=>p>=65?["High","var(--high)"]:p>=35?["Medium","var(--mid)"]:["Low","var(--low)"];
+const jobsEl=document.getElementById('jobs');
+function pick(i){
+  const [n,p,w]=JOBS[i];const [l,c]=lvl(p);
+  jobsEl.querySelectorAll('button').forEach((b,j)=>b.setAttribute('aria-pressed',j===i));
+  document.getElementById('vjob').textContent=n;document.getElementById('vwhy').textContent=w;
+  const r=document.getElementById('vrisk');r.textContent=l;r.style.color=c;
+  const b=document.getElementById('vbar');b.style.width=p+'%';b.style.background=c;
+}
+JOBS.forEach((j,i)=>{const b=document.createElement('button');b.type='button';b.textContent=j[0];b.onclick=()=>pick(i);jobsEl.appendChild(b);});
+pick(0);
+
+// zoe
+const DAY={
+  before:[["07:40","Arrives early to print worksheets"],["08:00","Teaches 3 classes in a row"],["12:30","Eats lunch while marking tests"],["15:00","Plans next week's lessons"],["21:00","Still answering parents' emails at home"]],
+  after:[["07:40","AI already made the worksheets, Zoe checks them",1],["08:00","Teaches 3 classes, AI tutor helps the students who are behind",1],["12:30","Actually eats lunch. AI marked the multiple choice",1],["15:00","Talks one-on-one with two students who are struggling"],["16:30","Meeting: the school asks if they \"still need\" two history teachers…"]]
+};
+const zday=document.getElementById('zday');
+function showDay(k){
+  zday.innerHTML='';
+  DAY[k].forEach(([t,x,ai])=>{const d=document.createElement('div');const tm=document.createElement('time');tm.textContent=t;
+    const s=document.createElement('span');s.textContent=x;if(ai)s.className='ai';d.append(tm,s);zday.appendChild(d);});
+  document.getElementById('zBefore').setAttribute('aria-pressed',k==='before');
+  document.getElementById('zAfter').setAttribute('aria-pressed',k==='after');
+}
+document.getElementById('zBefore').onclick=()=>showDay('before');
+document.getElementById('zAfter').onclick=()=>showDay('after');
+showDay('before');
+
+// quiz
+const Q=[
+  ["What does AI usually automate first?",["Whole jobs","Repetitive tasks","Creative ideas"],1,"Right: it goes task by task, starting with the boring predictable stuff."],
+  ["Which job is probably the safest from AI?",["Call center","Translator","Plumber"],2,"Yep. Robots are still really bad at weird physical jobs in random places."],
+  ["Why do companies want to use AI?",["It's trendy","It saves money","Workers asked for it"],1,"Exactly. In the end it's almost always about costs."]
+];
+const quiz=document.getElementById('quiz');let got=0,done=0;
+Q.forEach(([q,opts,ans,fb])=>{
+  const w=document.createElement('div');w.className='qq';
+  const p=document.createElement('p');p.textContent=q;const o=document.createElement('div');o.className='opts';
+  const f=document.createElement('p');f.className='fb';
+  opts.forEach((t,i)=>{const b=document.createElement('button');b.type='button';b.textContent=t;
+    b.onclick=()=>{if(w.dataset.done)return;w.dataset.done=1;done++;
+      if(i===ans){b.classList.add('right');got++;f.textContent=fb;}else{b.classList.add('wrong');o.children[ans].classList.add('right');f.textContent='Not quite. '+fb.replace(/^\w+[.:!]\s*/,'');}
+      document.getElementById('score').textContent=done===Q.length?`Score: ${got}/${Q.length}`:`Answered ${done}/${Q.length}`;};
+    o.appendChild(b);});
+  w.append(p,o,f);quiz.appendChild(w);
+});
+
+// rubric
+const R=["I researched the topic using different sources","I can explain how AI might replace (or help) workers","I used the case study to support my ideas","My product is clear and easy to understand","I gave my own opinion with reasons"];
+const rb=document.getElementById('rubric');
+R.forEach((r,i)=>{const tr=document.createElement('tr');const a=document.createElement('td');a.textContent=r;
+  const b=document.createElement('td');const d=document.createElement('div');d.className='dots';
+  for(let k=1;k<=5;k++){const x=document.createElement('button');x.type='button';x.setAttribute('aria-label',`${k} of 5`);
+    x.onclick=()=>[...d.children].forEach((y,j)=>y.classList.toggle('on',j<k));d.appendChild(x);}
+  b.appendChild(d);tr.append(a,b);rb.appendChild(tr);});
+
+// nav: highlight + arrow keys
+const ids=['start','humans','costs','zoe','future','verdict'];
+const links=[...document.querySelectorAll('nav a')];
+function current(){let c=0;ids.forEach((id,i)=>{if(document.getElementById(id).getBoundingClientRect().top<140)c=i;});return c;}
+function mark(){const c=current();links.forEach((l,i)=>l.classList.toggle('on',i===c));}
+addEventListener('scroll',mark,{passive:true});mark();
+addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('input,textarea'))return;
+  let c=current();if(e.key==='ArrowRight'||e.key==='PageDown'){c=Math.min(ids.length-1,c+1);}else if(e.key==='ArrowLeft'||e.key==='PageUp'){c=Math.max(0,c-1);}else return;
+  e.preventDefault();document.getElementById(ids[c]).scrollIntoView();});
+</script>
+
+</body>
+</html>
